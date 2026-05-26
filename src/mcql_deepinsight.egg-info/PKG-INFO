@@ -1,3 +1,20 @@
+Metadata-Version: 2.4
+Name: mcql-deepinsight
+Version: 0.2.1
+Summary: Method-only MCQL DeepInsight imputer
+Author: MCQL project
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.23
+Requires-Dist: scipy>=1.9
+Requires-Dist: scikit-learn>=1.2
+Requires-Dist: torch>=2.0
+Requires-Dist: tqdm>=4.64
+Provides-Extra: examples
+Requires-Dist: jupyter>=1.0; extra == "examples"
+Provides-Extra: umap
+Requires-Dist: umap-learn>=0.5; extra == "umap"
+
 # MCQL DeepInsight — method-only package
 
 This is a **method-only** package for the proposed MCQL imputer.

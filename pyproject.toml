@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcql-deepinsight"
+version = "0.2.1"
+description = "Method-only MCQL DeepInsight imputer"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "MCQL project" }]
+dependencies = [
+  "numpy>=1.23",
+  "scipy>=1.9",
+  "scikit-learn>=1.2",
+  "torch>=2.0",
+  "tqdm>=4.64"
+]
+
+[project.optional-dependencies]
+examples = ["jupyter>=1.0"]
+umap = ["umap-learn>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
