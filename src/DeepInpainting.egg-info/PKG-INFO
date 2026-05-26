@@ -1,0 +1,149 @@
+Metadata-Version: 2.4
+Name: DeepInpainting
+Version: 0.1.0
+Summary: DeepInpainting: DeepInsight-style masked conditional quantile inpainting for incomplete tabular data
+Author: DeepInpainting project
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.23
+Requires-Dist: scipy>=1.9
+Requires-Dist: scikit-learn>=1.2
+Requires-Dist: torch>=2.0
+Requires-Dist: tqdm>=4.64
+Provides-Extra: umap
+Requires-Dist: umap-learn>=0.5; extra == "umap"
+Provides-Extra: examples
+Requires-Dist: jupyter>=1.0; extra == "examples"
+
+# DeepInpainting
+
+**DeepInpainting** is a DeepInsight-style tabular inpainting method for high-dimensional incomplete data. It converts each tabular sample into an artificial image using a feature-to-pixel map, learns a masked conditional distribution over feature-wise quantile tokens, and decodes the predicted distribution back to tabular values for imputation.
+
+The current implementation focuses on the proposed method itself. Benchmark scripts, paper-run outputs, and dataset-specific experiment code are kept outside this package.
+
+## Overview
+
+DeepInpainting treats tabular imputation as an image-conditioned masked feature prediction problem. Given an incomplete matrix \(X \in \mathbb{R}^{n \times p}\), each feature is embedded into a two-dimensional pixel coordinate. Each sample then becomes a sparse artificial image whose occupied pixels correspond to features or groups of features.
+
+During training, the model does not use true values at actual missing entries. Instead, it samples pseudo-missing entries from observed values and trains a convolutional network to predict their feature-wise quantile tokens from the remaining observed image context. At inference, the learned conditional distribution is evaluated at actual missing locations and decoded into continuous feature values.
+
+![DeepInpainting overall pipeline](assets/Figure1.png)
+
+**Figure 1. Overall pipeline of DeepInpainting.** An incomplete tabular matrix is transformed into a DeepInsight-style artificial image through feature embedding and pixel mapping. Observed entries define the image context, missing locations are represented by sentinel values, and the model predicts missing feature values through masked conditional quantile learning. The resulting imputed entries are written back to the original tabular matrix.
+
+## Method
+
+DeepInpainting consists of five main steps.
+
+### 1. Feature-to-pixel mapping
+
+Features are treated as points and embedded into a two-dimensional space using a reducer such as PCA or UMAP. The embedded feature coordinates are discretized onto an image grid. This produces a fixed map
+
+```text
+feature j -> pixel coordinate pi(j) = (u_j, v_j)
+```
+
+which is shared across all samples.
+
+### 2. Image construction from incomplete tabular data
+
+For each sample, observed feature values are converted into an image value channel. The package uses feature-wise quantile scaling so that features with different raw scales can be represented in a common range. Missing and unavailable entries are represented by sentinel values, and empty pixels are represented separately.
+
+The input image includes three channels:
+
+```text
+value channel
+x-coordinate channel
+y-coordinate channel
+```
+
+The coordinate channels help the CNN distinguish positions in the DeepInsight image, since the artificial image is not a natural image and translation invariance alone is not sufficient to identify features.
+
+### 3. Pseudo-missing training
+
+Actual missing values are not used as supervised targets. During training, DeepInpainting randomly masks a subset of observed entries and uses only these pseudo-missing entries for the training loss.
+
+```text
+observed entry        -> input context
+pseudo-missing entry  -> hidden in input, used as target
+actual missing entry  -> hidden in input, not used as target
+empty pixel           -> ignored
+```
+
+This self-supervised masking scheme lets the model learn conditional feature reconstruction without leaking the true values of the actual missing entries.
+
+### 4. Masked Conditional Quantile Likelihood
+
+Each continuous feature is converted into a feature-wise quantile token. With \(K\) bins, the target for feature \(j\) in sample \(i\) is
+
+```text
+b_ij in {0, ..., K-1}
+```
+
+The CNN outputs a categorical distribution over these quantile tokens at each image pixel. The loss is a masked cross-entropy computed only at pseudo-missing feature positions:
+
+```text
+L_MCQL = - mean log q_theta(b_ij | observed DeepInsight image)
+```
+
+This objective is not a pixel-wise regression loss. It learns a conditional distribution over feature-wise quantile tokens and avoids directly optimizing RMSE, SWD, or downstream task performance during training.
+
+### 5. Expectation decoding
+
+At inference, DeepInpainting predicts a probability vector over quantile bins for each missing feature. The final continuous imputed value is obtained by expectation decoding using feature-specific bin representatives:
+
+```text
+x_hat_ij = sum_k q_ijk * c_jk
+```
+
+where \(c_{jk}\) is the representative raw value of bin \(k\) for feature \(j\), estimated from observed entries. Observed entries are copied back unchanged in the completed matrix.
+
+## Installation
+
+Install directly from the GitHub repository:
+
+```bash
+pip install "DeepInpainting @ git+https://github.com/dlakakwns/DeepInpainting.git"
+```
+
+For a tagged release, use:
+
+```bash
+pip install "DeepInpainting @ git+https://github.com/dlakakwns/DeepInpainting.git@v0.1.0"
+```
+
+For editable development:
+
+```bash
+git clone https://github.com/dlakakwns/DeepInpainting.git
+cd DeepInpainting
+pip install -e .
+```
+
+Optional UMAP support can be installed with:
+
+```bash
+pip install "DeepInpainting[umap] @ git+https://github.com/dlakakwns/DeepInpainting.git"
+```
+
+## Python API
+
+After installation, the package is intended to be used as:
+
+```python
+from deepinpainting import DeepInpaintingImputer
+```
+
+A lightweight synthetic-data walkthrough is provided in the example notebook. The example is intentionally small and does not require GLI-85 or other benchmark datasets.
+
+```text
+examples/synthetic_quickstart.ipynb
+```
+
+## Repository scope
+
+This repository is designed as a method implementation package. It provides the DeepInpainting imputer and a lightweight example for using it on an incomplete tabular matrix. Large benchmark datasets, paper-run outputs, and external baseline implementations are not included in the package repository.
+
+## Citation
+
+A formal citation entry will be added when the manuscript is available. If you use this package before then, please cite the GitHub repository.
